@@ -1,166 +1,222 @@
-"use client"
+// SafeSocial_Admin/components/user-management.tsx
 
-import { useState } from "react"
-import { Card } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Lock, Unlock, Search, MoreVertical } from "lucide-react"
+"use client";
 
-const mockUsers = [
-  {
-    id: 1,
-    name: "Nguyễn Văn A",
-    email: "nguyenvana@email.com",
-    status: "active",
-    posts: 145,
-    reports: 0,
-    joinDate: "2024-01-15",
-  },
-  {
-    id: 2,
-    name: "Trần Thị B",
-    email: "tranthib@email.com",
-    status: "active",
-    posts: 89,
-    reports: 2,
-    joinDate: "2024-02-20",
-  },
-  {
-    id: 3,
-    name: "Lê Văn C",
-    email: "levanc@email.com",
-    status: "locked",
-    posts: 234,
-    reports: 8,
-    joinDate: "2023-11-10",
-  },
-  {
-    id: 4,
-    name: "Phạm Thị D",
-    email: "phamthid@email.com",
-    status: "active",
-    posts: 67,
-    reports: 1,
-    joinDate: "2024-03-05",
-  },
-  {
-    id: 5,
-    name: "Hoàng Văn E",
-    email: "hoangvane@email.com",
-    status: "active",
-    posts: 312,
-    reports: 0,
-    joinDate: "2023-09-22",
-  },
-]
+import { useState, useEffect } from "react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { MoreHorizontal, UserX, UserCheck, ShieldOff } from "lucide-react";
+import { toast } from "sonner";
+import { fetchWithAuth } from "@/lib/api";
 
-export function UserManagement() {
-  const [users, setUsers] = useState(mockUsers)
-  const [searchTerm, setSearchTerm] = useState("")
+// Định nghĩa kiểu dữ liệu (Interface) cho User
+// Dựa trên User Model của server
+interface User {
+  _id: string;
+  full_name: string;
+  email: string;
+  username: string;
+  isAdmin: boolean;
+  status: 'active' | 'locked'; // Dựa trên logic status của server
+  createdAt: string;
+}
 
-  const toggleUserStatus = (userId: number) => {
-    setUsers(
-      users.map((user) =>
-        user.id === userId ? { ...user, status: user.status === "active" ? "locked" : "active" } : user,
-      ),
-    )
+export default function UserManagement() {
+  const [users, setUsers] = useState<User[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [currentAdminId, setCurrentAdminId] = useState<string | null>(null);
+
+  // Lấy ID của admin đang đăng nhập (để tránh tự khóa mình)
+  useEffect(() => {
+    try {
+      const storedUser = localStorage.getItem('admin_user');
+      if (storedUser) {
+        const user = JSON.parse(storedUser);
+        // Giả sử API login trả về _id (Nếu không, bạn cần sửa lại hàm loginAdmin)
+        // Nếu hàm login chỉ trả về 'id', dùng 'user.id'
+        // setCurrentAdminId(user._id); 
+      }
+    } catch (e) { console.error(e); }
+  }, []);
+
+  // --- HÀM LẤY DỮ LIỆU ---
+  const fetchUsers = async () => {
+    setIsLoading(true);
+    try {
+      // Dùng hàm helper (đã tự đính kèm Token)
+      // API endpoint: GET /api/users/all
+      const data = await fetchWithAuth("/user/all", {
+        method: 'GET',
+      });
+
+      if (data.success) {
+        setUsers(data.users);
+      } else {
+        toast.error(data.message || "Không thể tải danh sách người dùng.");
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Lỗi khi tải dữ liệu người dùng.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Tự động gọi fetchUsers khi component được mount
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  // --- CÁC HÀM HÀNH ĐỘNG ---
+
+  // Hàm Khóa (Lock) User
+  const handleLockUser = async (userId: string) => {
+    try {
+      // API endpoint: PATCH /api/users/:userId/lock
+      const data = await fetchWithAuth(`/user/${userId}/lock`, {
+        method: 'PATCH',
+      });
+
+      if (data.success) {
+        toast.success(data.message || `Đã khóa tài khoản.`);
+        fetchUsers(); // Tải lại danh sách
+      } else {
+        toast.error(data.message || "Khóa thất bại.");
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Lỗi khi khóa người dùng.");
+    }
+  };
+
+  // Hàm Mở khóa (Unlock) User
+  const handleUnlockUser = async (userId: string) => {
+    try {
+      // API endpoint: PATCH /api/users/:userId/unlock
+      const data = await fetchWithAuth(`/user/${userId}/unlock`, {
+        method: 'PATCH',
+      });
+
+      if (data.success) {
+        toast.success(data.message || `Đã mở khóa tài khoản.`);
+        fetchUsers(); // Tải lại danh sách
+      } else {
+        toast.error(data.message || "Mở khóa thất bại.");
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Lỗi khi mở khóa người dùng.");
+    }
+  };
+
+  // --- RENDER ---
+
+  if (isLoading) {
+    return <div className="text-center p-10">Đang tải danh sách người dùng...</div>;
   }
 
-  const filteredUsers = users.filter(
-    (user) =>
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
-
   return (
-    <div className="p-8 space-y-6">
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search users by name or email..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 bg-secondary border-border"
-          />
-        </div>
-      </div>
+    <div className="space-y-4 p-8">
+      <p className="text-muted-foreground">
+        Tổng số {users.length} tài khoản trong hệ thống.
+      </p>
 
-      <Card className="bg-card border-border overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="border-b border-border bg-secondary/50">
-              <tr>
-                <th className="text-left px-6 py-4 text-sm font-medium text-muted-foreground">User</th>
-                <th className="text-left px-6 py-4 text-sm font-medium text-muted-foreground">Email</th>
-                <th className="text-left px-6 py-4 text-sm font-medium text-muted-foreground">Status</th>
-                <th className="text-left px-6 py-4 text-sm font-medium text-muted-foreground">Posts</th>
-                <th className="text-left px-6 py-4 text-sm font-medium text-muted-foreground">Reports</th>
-                <th className="text-left px-6 py-4 text-sm font-medium text-muted-foreground">Join Date</th>
-                <th className="text-right px-6 py-4 text-sm font-medium text-muted-foreground">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {filteredUsers.map((user) => (
-                <tr key={user.id} className="hover:bg-secondary/30 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-sm font-semibold">
-                        {user.name.charAt(0)}
-                      </div>
-                      <span className="font-medium">{user.name}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-muted-foreground">{user.email}</td>
-                  <td className="px-6 py-4">
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        user.status === "active" ? "bg-success/20 text-success" : "bg-destructive/20 text-destructive"
-                      }`}
-                    >
-                      {user.status === "active" ? "Active" : "Locked"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm">{user.posts}</td>
-                  <td className="px-6 py-4">
-                    <span
-                      className={`text-sm ${user.reports > 0 ? "text-destructive font-medium" : "text-muted-foreground"}`}
-                    >
-                      {user.reports}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-muted-foreground">{user.joinDate}</td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button
-                        size="sm"
-                        variant={user.status === "active" ? "destructive" : "default"}
-                        onClick={() => toggleUserStatus(user.id)}
-                        className="gap-2"
-                      >
-                        {user.status === "active" ? (
-                          <>
-                            <Lock className="w-4 h-4" />
-                            Lock
-                          </>
-                        ) : (
-                          <>
-                            <Unlock className="w-4 h-4" />
-                            Unlock
-                          </>
-                        )}
-                      </Button>
-                      <Button size="sm" variant="ghost">
-                        <MoreVertical className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+      {/* Bảng dữ liệu */}
+      <div className="border rounded-lg">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Họ tên</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Username</TableHead>
+              <TableHead>Vai trò</TableHead>
+              <TableHead>Trạng thái</TableHead>
+              <TableHead>Ngày tham gia</TableHead>
+              <TableHead className="text-right">Hành động</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {users.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center h-24">
+                  Không tìm thấy người dùng nào.
+                </TableCell>
+              </TableRow>
+            ) : (
+              users.map((user) => (
+                <TableRow key={user._id}>
+                  <TableCell className="font-medium">{user.full_name}</TableCell>
+                  <TableCell>{user.email}</TableCell>
+                  <TableCell>{user.username || "N/A"}</TableCell>
+                  <TableCell>
+                    {user.isAdmin ? (
+                      <Badge variant="destructive">Admin</Badge>
+                    ) : (
+                      <Badge variant="outline">User</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {user.status === 'active' ? (
+                      <Badge variant="default" className="bg-green-600 hover:bg-green-700">Hoạt động</Badge>
+                    ) : (
+                      <Badge variant="secondary">Đã khóa</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {new Date(user.createdAt).toLocaleDateString('vi-VN')}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {/* Không cho phép thao tác với Admin */}
+                    {user.isAdmin ? (
+                      <span className="flex items-center justify-end text-xs text-muted-foreground">
+                        <ShieldOff className="w-4 h-4 mr-1" /> Không thể thao tác
+                      </span>
+                    ) : (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {user.status === 'active' ? (
+                            <DropdownMenuItem
+                              className="text-red-500"
+                              onClick={() => handleLockUser(user._id)}
+                            >
+                              <UserX className="w-4 h-4 mr-2" />
+                              Khóa tài khoản
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem
+                              className="text-green-600"
+                              onClick={() => handleUnlockUser(user._id)}
+                            >
+                              <UserCheck className="w-4 h-4 mr-2" />
+                              Mở khóa tài khoản
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </div>
-  )
+  );
 }

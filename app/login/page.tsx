@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { toast } from 'sonner';
 
 // URL của server API của bạn
-const SERVER_URL = "http://localhost:5000"; // THAY THẾ BẰNG URL SERVER CỦA BẠN (nếu không chạy local)
+const SERVER_URL = "http://localhost:5000";
 
 export default function LoginPage() {
     const [email, setEmail] = useState('');
@@ -24,7 +24,7 @@ export default function LoginPage() {
         setIsLoading(true);
 
         try {
-            const response = await fetch(`${SERVER_URL}/api/users/admin/login`, {
+            const response = await fetch(`${SERVER_URL}/api/user/admin/login`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

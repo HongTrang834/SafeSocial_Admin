@@ -1,10 +1,8 @@
-import { Sidebar } from "@/components/sidebar"
 import { DashboardOverview } from "@/components/dashboard-overview"
 
 export default function AdminPage() {
   return (
     <div className="flex h-screen bg-slate-100">
-      <Sidebar />
       <main className="flex-1 overflow-y-auto bg-slate-100">
         <div className="border-b border-slate-200 bg-white sticky top-0 z-10">
           <div className="flex items-center justify-between px-8 py-6">
