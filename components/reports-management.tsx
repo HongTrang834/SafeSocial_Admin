@@ -1,142 +1,242 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Card } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Flag, Check, X, Eye, MessageSquare } from "lucide-react"
+import { useState, useEffect } from "react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { toast } from "sonner";
+import { fetchWithAuth } from "@/lib/api"; 
 
-const mockReports = [
-  {
-    id: 1,
-    reportedUser: "Lê Văn C",
-    reportedBy: "Nguyễn Văn A",
-    reason: "Harassment",
-    description: "User is sending threatening messages and harassing other members",
-    postId: "POST-1234",
-    timestamp: "2025-02-10 15:20",
-    status: "pending",
-    priority: "high",
-  },
-  {
-    id: 2,
-    reportedUser: "Phạm Thị D",
-    reportedBy: "Trần Thị B",
-    reason: "Spam",
-    description: "Posting promotional content repeatedly",
-    postId: "POST-1235",
-    timestamp: "2025-02-10 14:10",
-    status: "pending",
-    priority: "low",
-  },
-  {
-    id: 3,
-    reportedUser: "Hoàng Văn E",
-    reportedBy: "Multiple Users",
-    reason: "Inappropriate Content",
-    description: "Sharing explicit content that violates community guidelines",
-    postId: "POST-1236",
-    timestamp: "2025-02-10 13:30",
-    status: "pending",
-    priority: "high",
-  },
-]
+interface ReportUser {
+  _id: string;
+  full_name: string;
+  username: string;
+  profile_picture: string;
+}
 
-export function ReportsManagement() {
-  const [reports, setReports] = useState(mockReports)
+interface ReportedPost {
+  _id: string;
+  content: string;
+  image_urls: string[];
+  user: ReportUser;
+  createdAt: string;
+}
 
-  const handleResolve = (id: number, action: "approve" | "reject") => {
-    setReports(reports.filter((r) => r.id !== id))
-    console.log("[v0] Report resolved:", id, action)
-  }
+// Kiểu dữ liệu chính cho Report
+interface Report {
+  _id: string;
+  reporter: ReportUser; 
+  post: ReportedPost;   // Đã populate
+  story: any; 
+  type: 'post' | 'story' | 'user' | 'comment'; 
+  reason: string;
+  status: 'pending' | 'reviewed' | 'dismissed'; //
+  createdAt: string;
+}
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case "high":
-        return "text-destructive bg-destructive/20"
-      case "medium":
-        return "text-accent bg-accent/20"
-      case "low":
-        return "text-muted-foreground bg-muted"
-      default:
-        return "text-muted-foreground bg-muted"
+export default function ReportsManagement() {
+  const [reports, setReports] = useState<Report[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [filter, setFilter] = useState<'pending' | 'reviewed' | 'dismissed'>('pending');
+
+  // --- HÀM LẤY DỮ LIỆU ---
+  const fetchReports = async () => {
+    setIsLoading(true);
+    try {
+      // Dùng hàm helper (đã tự đính kèm Token)
+      // API endpoint: GET /api/report/all
+      // (Hãy chắc chắn prefix của bạn trong server.js là /api/reports)
+      const data = await fetchWithAuth("/report/all", {
+        method: 'GET',
+      });
+
+      if (data.success) {
+        setReports(data.reports);
+      } else {
+        toast.error(data.message || "Không thể tải danh sách báo cáo.");
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Lỗi khi tải dữ liệu báo cáo.");
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  // Tự động gọi fetchReports khi component được mount
+  useEffect(() => {
+    fetchReports();
+  }, []);
+
+  // --- HÀM HÀNH ĐỘNG CỦA ADMIN ---
+  const handleUpdateStatus = async (reportId: string, status: 'reviewed' | 'dismissed') => {
+    try {
+      // API endpoint: PUT /api/report/:id
+      const data = await fetchWithAuth(`/report/${reportId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ status }), // Gửi status mới
+      });
+
+      if (data.success) {
+        toast.success(`Đã cập nhật báo cáo thành "${status}".`);
+        fetchReports(); // Tải lại danh sách
+      } else {
+        toast.error(data.message || "Cập nhật thất bại.");
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Lỗi khi cập nhật báo cáo.");
+    }
+  };
+
+  // Lọc danh sách reports dựa trên filter
+  const filteredReports = reports.filter(report => report.status === filter);
+
+  // --- RENDER ---
+  if (isLoading) {
+    return <div className="text-center p-10">Đang tải danh sách báo cáo...</div>;
   }
 
   return (
-    <div className="p-8 space-y-6">
-      {reports.length === 0 ? (
-        <Card className="p-12 bg-card border-border text-center">
-          <Check className="w-12 h-12 text-success mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No Pending Reports</h3>
-          <p className="text-muted-foreground">All user reports have been reviewed</p>
-        </Card>
-      ) : (
-        <div className="space-y-4">
-          {reports.map((report) => (
-            <Card key={report.id} className="p-6 bg-card border-border">
-              <div className="space-y-4">
-                <div className="flex items-start justify-between">
-                  <div className="space-y-2 flex-1">
-                    <div className="flex items-center gap-3">
-                      <Flag className="w-5 h-5 text-destructive" />
-                      <span className="font-semibold text-lg">{report.reason}</span>
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPriorityColor(report.priority)}`}
-                      >
-                        {report.priority.toUpperCase()} PRIORITY
-                      </span>
+    <div className="space-y-4">
+
+      {/* Bộ lọc Tabs */}
+      <div className="flex space-x-100 border-b pb-2 mb-4 ">
+        <Button
+          variant={filter === 'pending' ? 'default' : 'ghost'}
+          onClick={() => setFilter('pending')}
+        >
+          <AlertCircle className="w-4 h-4 mr-2" />
+          Đang chờ ({reports.filter(r => r.status === 'pending').length})
+        </Button>
+        <Button
+          variant={filter === 'reviewed' ? 'default' : 'ghost'}
+          onClick={() => setFilter('reviewed')}
+        >
+          <CheckCircle className="w-4 h-4 mr-2" />
+          Đã xử lý ({reports.filter(r => r.status === 'reviewed').length})
+        </Button>
+        <Button
+          variant={filter === 'dismissed' ? 'default' : 'ghost'}
+          onClick={() => setFilter('dismissed')}
+
+        >
+          <XCircle className="w-4 h-4 mr-2" />
+          Đã bỏ qua ({reports.filter(r => r.status === 'dismissed').length})
+        </Button>
+      </div>
+
+      {/* Bảng dữ liệu */}
+      <div className="border rounded-lg">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Người báo cáo</TableHead>
+              <TableHead>Lý do</TableHead>
+              <TableHead>Loại</TableHead>
+              <TableHead>Nội dung bị báo cáo</TableHead>
+              <TableHead>Ngày báo cáo</TableHead>
+              <TableHead className="text-right">Hành động</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredReports.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center h-24">
+                  Không có báo cáo nào trong mục này.
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredReports.map((report) => (
+                <TableRow key={report._id}>
+                  {/* Người báo cáo */}
+                  <TableCell>
+                    <div className="flex items-center space-x-2">
+                      <Avatar className="w-8 h-8">
+                        <AvatarImage src={report.reporter?.profile_picture} />
+                        <AvatarFallback>
+                          {report.reporter?.full_name.charAt(0) || 'U'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <div className="font-medium">{report.reporter?.full_name || "N/A"}</div>
+                        <div className="text-xs text-muted-foreground">@{report.reporter?.username || "N/A"}</div>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <span>
-                        Reported User: <span className="text-foreground font-medium">{report.reportedUser}</span>
+                  </TableCell>
+
+                  {/* Lý do */}
+                  <TableCell className="font-medium max-w-xs truncate" title={report.reason}>
+                    {report.reason}
+                  </TableCell>
+
+                  {/* Loại */}
+                  <TableCell>
+                    <Badge variant="outline">{report.type?.toUpperCase() || "N/A"}</Badge>
+                  </TableCell>
+
+                  {/* Nội dung bị báo cáo */}
+                  <TableCell className="text-sm text-muted-foreground max-w-xs truncate">
+                    {report.post ? (
+                      <span title={report.post.content}>
+                        Bài viết của <strong>{report.post.user?.full_name || "N/A"}</strong>: "{report.post.content}"
                       </span>
-                      <span>•</span>
-                      <span>
-                        By: <span className="text-foreground font-medium">{report.reportedBy}</span>
-                      </span>
-                      <span>•</span>
-                      <span>{report.timestamp}</span>
-                    </div>
-                  </div>
-                </div>
+                    ) : report.story ? (
+                      "Một Story (ID: " + report.story + ")"
+                    ) : "N/A"}
+                  </TableCell>
 
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Description:</p>
-                  <div className="p-4 bg-secondary/50 rounded-lg border border-border">
-                    <p className="text-sm">{report.description}</p>
-                  </div>
-                </div>
+                  {/* Ngày báo cáo */}
+                  <TableCell>
+                    {new Date(report.createdAt).toLocaleDateString('vi-VN')}
+                  </TableCell>
 
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <MessageSquare className="w-4 h-4" />
-                  <span>
-                    Related Post: <span className="text-foreground font-mono">{report.postId}</span>
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-3 pt-2">
-                  <Button
-                    variant="default"
-                    className="gap-2 bg-success hover:bg-success/90"
-                    onClick={() => handleResolve(report.id, "approve")}
-                  >
-                    <Check className="w-4 h-4" />
-                    Dismiss Report
-                  </Button>
-                  <Button variant="destructive" className="gap-2" onClick={() => handleResolve(report.id, "reject")}>
-                    <X className="w-4 h-4" />
-                    Take Action
-                  </Button>
-                  <Button variant="outline" className="gap-2 ml-auto bg-transparent">
-                    <Eye className="w-4 h-4" />
-                    View Details
-                  </Button>
-                </div>
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
+                  {/* Hành động */}
+                  <TableCell className="text-right">
+                    {report.status === 'pending' && (
+                      <div className="flex justify-end space-x-2">
+                        {/* Nút Duyệt */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-green-600 border-green-600 hover:bg-green-50 hover:text-green-700"
+                          onClick={() => handleUpdateStatus(report._id, 'reviewed')}
+                        >
+                          <CheckCircle className="w-4 h-4 mr-1" />
+                          Xóa
+                        </Button>
+                        {/* Nút Bỏ qua */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-gray-500 border-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                          onClick={() => handleUpdateStatus(report._id, 'dismissed')}
+                        >
+                          <XCircle className="w-4 h-4 mr-1" />
+                          Bỏ qua
+                        </Button>
+                      </div>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </div>
-  )
+  );
 }
