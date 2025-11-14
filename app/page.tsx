@@ -1,4 +1,4 @@
-import { DashboardOverview } from "@/components/dashboard-overview"
+import DashboardOverview from "@/components/analytics-dashboard"
 
 export default function AdminPage() {
   return (

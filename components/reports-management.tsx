@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { CheckCircle, XCircle, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
-import { fetchWithAuth } from "@/lib/api"; 
+import { fetchWithAuth } from "@/lib/api";
 
 interface ReportUser {
   _id: string;
@@ -40,10 +40,10 @@ interface ReportedPost {
 // Kiểu dữ liệu chính cho Report
 interface Report {
   _id: string;
-  reporter: ReportUser; 
+  reporter: ReportUser;
   post: ReportedPost;   // Đã populate
-  story: any; 
-  type: 'post' | 'story' | 'user' | 'comment'; 
+  story: any;
+  type: 'post' | 'story' | 'user' | 'comment';
   reason: string;
   status: 'pending' | 'reviewed' | 'dismissed'; //
   createdAt: string;
